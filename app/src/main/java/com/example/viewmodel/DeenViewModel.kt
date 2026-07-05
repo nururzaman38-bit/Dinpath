@@ -142,8 +142,8 @@ class DeenViewModel(application: Application) : AndroidViewModel(application) {
         
         isAiTyping.value = true
         viewModelScope.launch {
-            val apiKey = cloudConfig.value?.openrouterApiKey ?: ""
-            val modelId = cloudConfig.value?.openrouterModelId ?: "google/gemini-2.0-flash-lite-preview-02-05:free"
+            val apiKey = settingsManager.customApiKey.value.ifBlank { cloudConfig.value?.openrouterApiKey ?: "" }
+            val modelId = settingsManager.customModelId.value.ifBlank { cloudConfig.value?.openrouterModelId ?: "google/gemini-2.5-flash" }
             val response = AiChatEngine.sendChatMessage(apiKey, modelId, currentList, prompt)
             val aiMsg = ChatMessage(text = response, isUser = false)
             val updatedList = chatMessages.value.toMutableList()
@@ -561,6 +561,37 @@ class DeenViewModel(application: Application) : AndroidViewModel(application) {
     private fun playUrl(url: String, isSurah: Boolean, isAzan: Boolean = false, isDua: Boolean = false) {
         viewModelScope.launch {
             try {
+                var effectiveUrl = url
+                if (url.startsWith("http")) {
+                    val safeName = url.replace(Regex("[^a-zA-Z0-9.-]"), "_").takeLast(80) + ".mp3"
+                    val cacheDir = File(getApplication<Application>().filesDir, "audio_auto_cache").apply { mkdirs() }
+                    val cachedFile = File(cacheDir, safeName)
+                    if (cachedFile.exists() && cachedFile.length() > 1000) {
+                        effectiveUrl = cachedFile.absolutePath
+                    } else {
+                        viewModelScope.launch(Dispatchers.IO) {
+                            try {
+                                val conn = URL(url).openConnection() as HttpURLConnection
+                                conn.connectTimeout = 10000
+                                conn.readTimeout = 15000
+                                if (conn.responseCode == 200) {
+                                    val tempFile = File(cacheDir, "$safeName.tmp")
+                                    conn.inputStream.use { input ->
+                                        tempFile.outputStream().use { output ->
+                                            input.copyTo(output)
+                                        }
+                                    }
+                                    if (tempFile.exists() && tempFile.length() > 1000) {
+                                        tempFile.renameTo(cachedFile)
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
+                }
+
                 if (mediaPlayer == null) {
                     mediaPlayer = MediaPlayer().apply {
                         setOnPreparedListener { mp ->
@@ -626,7 +657,7 @@ class DeenViewModel(application: Application) : AndroidViewModel(application) {
                     progressJob?.cancel()
                     _audioProgress.value = 0f
                     mp.reset()
-                    mp.setDataSource(url)
+                    mp.setDataSource(effectiveUrl)
                     currentLoadedUrl = url
                     mp.prepareAsync()
                 }
@@ -659,7 +690,18 @@ class DeenViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        _surahDownloadPrompt.value = surah
+        // Stream and auto download in background!
+        val serverBase = when (qariName) {
+            "Saad Al-Ghamdi" -> "https://server7.mp3quran.net/s_gmd/"
+            "Maher Al-Muaiqly" -> "https://server12.mp3quran.net/maher/"
+            "Abu Bakr Al-Shatri" -> "https://server11.mp3quran.net/shatri/"
+            else -> "https://server8.mp3quran.net/afs/"
+        }
+        val url = "$serverBase$surahIdFormatted.mp3"
+        _isPlayingAzan.value = false
+        _playingSurahName.value = surahName
+        _isPlayingAudio.value = true
+        playUrl(url, isSurah = true)
     }
 
     fun pauseAudioPlayback() {
@@ -709,10 +751,10 @@ class DeenViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         val url = when (azanTypeVal) {
-            "Makkah" -> "https://www.islamcan.com/audio/adhan/makkah.mp3"
-            "Madinah" -> "https://www.islamcan.com/audio/adhan/madina.mp3"
-            "Mishary Rashid" -> "https://www.islamcan.com/audio/adhan/mishary.mp3"
-            else -> "https://www.islamcan.com/audio/adhan/makkah.mp3"
+            "Makkah" -> "https://ia800300.us.archive.org/34/items/AdhanMakkah/Adhan%20Makkah.mp3"
+            "Madinah" -> "https://ia600300.us.archive.org/34/items/AdhanMakkah/Adhan%20Madina.mp3"
+            "Mishary Rashid" -> "https://ia800300.us.archive.org/34/items/AdhanMakkah/Adhan%20Mishary.mp3"
+            else -> "https://ia800300.us.archive.org/34/items/AdhanMakkah/Adhan%20Makkah.mp3"
         }
 
         // Stop Surah or Dua if playing
@@ -740,17 +782,23 @@ class DeenViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun playDuaAudio(title: String) {
-        // Al-Fatihah is the greatest Dua in the Quran, let's play it beautifully!
-        val url = "https://server8.mp3quran.net/afs/001.mp3"
+    fun playDuaAudio(dua: Dua) {
+        val url = DuaData.getDuaAudioUrl(dua)
 
         // Stop Surah or Azan if playing
         stopAudio()
         _isPlayingAzan.value = false
 
-        _playingDuaTitle.value = title
+        _playingDuaTitle.value = dua.title
         _isPlayingDua.value = true
         playUrl(url, isSurah = false, isAzan = false, isDua = true)
+    }
+
+    fun playDuaAudio(title: String) {
+        val customDuasJson = settingsManager.customDuasJson.value
+        val allDuas = DuaData.getCombinedDuas(customDuasJson)
+        val dua = allDuas.find { it.title == title } ?: Dua("0", "morning", title, "", "", "", "", "https://ia801503.us.archive.org/15/items/Hisn_Almuslim_Audio/027.mp3")
+        playDuaAudio(dua)
     }
 
     fun stopDuaAudio() {

@@ -43,6 +43,8 @@ fun DuaScreen(
     val bookmarks by viewModel.allBookmarks.collectAsState()
     val isPlayingDua by viewModel.isPlayingDua.collectAsState()
     val playingDuaTitle by viewModel.playingDuaTitle.collectAsState()
+    val customDuasJson by viewModel.settingsManager.customDuasJson.collectAsState()
+    val allDuas = remember(customDuasJson) { DuaData.getCombinedDuas(customDuasJson) }
 
     if (selectedCategory == null) {
         // ① Categories Grid View (9A)
@@ -106,7 +108,7 @@ fun DuaScreen(
     } else {
         // ② Detailed scroll views with swipe navigation indexes (9B)
         val cat = selectedCategory!!
-        val categoryDuas = remember(cat) { DuaData.duas.filter { it.categoryId == cat.id } }
+        val categoryDuas = remember(cat, allDuas) { allDuas.filter { it.categoryId == cat.id } }
         val activeIndex = selectedDuaIndex ?: 0
         val targetDua = categoryDuas.getOrNull(activeIndex) ?: categoryDuas.first()
 
@@ -272,7 +274,7 @@ fun DuaScreen(
                                 if (isThisDuaPlaying) {
                                     viewModel.stopDuaAudio()
                                 } else {
-                                    viewModel.playDuaAudio(targetDua.title)
+                                    viewModel.playDuaAudio(targetDua)
                                     Toast.makeText(context, "দোয়ার মধুমাখা তিলাওয়াত অডিও শুরু হচ্ছে...", Toast.LENGTH_SHORT).show()
                                 }
                             },

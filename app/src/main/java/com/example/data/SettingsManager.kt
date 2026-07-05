@@ -164,4 +164,77 @@ class SettingsManager(context: Context) {
         prefs.edit().putInt("completed_roshas_count", count).apply()
         _completedRoshasCount.value = count
     }
+
+    private val _customApiKey = MutableStateFlow(getCustomApiKey())
+    val customApiKey: StateFlow<String> = _customApiKey
+
+    private val _customModelId = MutableStateFlow(getCustomModelId())
+    val customModelId: StateFlow<String> = _customModelId
+
+    private val _customDuasJson = MutableStateFlow(getCustomDuasJson())
+    val customDuasJson: StateFlow<String> = _customDuasJson
+
+    fun getCustomApiKey(): String = prefs.getString("custom_openrouter_api_key", "") ?: ""
+    fun setCustomApiKey(key: String) {
+        prefs.edit().putString("custom_openrouter_api_key", key).apply()
+        _customApiKey.value = key
+    }
+
+    fun getCustomModelId(): String = prefs.getString("custom_openrouter_model_id", "") ?: ""
+    fun setCustomModelId(modelId: String) {
+        prefs.edit().putString("custom_openrouter_model_id", modelId).apply()
+        _customModelId.value = modelId
+    }
+
+    fun getCustomDuasJson(): String = prefs.getString("custom_duas_json", "[]") ?: "[]"
+    fun setCustomDuasJson(jsonStr: String) {
+        prefs.edit().putString("custom_duas_json", jsonStr).apply()
+        _customDuasJson.value = jsonStr
+    }
+
+    // Admin Secret Access PIN & Status
+    private val _adminSecretPin = MutableStateFlow(getAdminSecretPin())
+    val adminSecretPin: StateFlow<String> = _adminSecretPin
+
+    private val _isAdminUnlocked = MutableStateFlow(false)
+    val isAdminUnlocked: StateFlow<Boolean> = _isAdminUnlocked
+
+    fun getAdminSecretPin(): String = prefs.getString("admin_secret_pin", "050126") ?: "050126"
+    fun setAdminSecretPin(pin: String) {
+        prefs.edit().putString("admin_secret_pin", pin).apply()
+        _adminSecretPin.value = pin
+    }
+    fun setAdminUnlocked(unlocked: Boolean) {
+        _isAdminUnlocked.value = unlocked
+    }
+
+    // Custom Scraped / Admin Feed & Quizzes
+    private val _customFeedJson = MutableStateFlow(getCustomFeedJson())
+    val customFeedJson: StateFlow<String> = _customFeedJson
+
+    private val _customQuizJson = MutableStateFlow(getCustomQuizJson())
+    val customQuizJson: StateFlow<String> = _customQuizJson
+
+    private val _quizScore = MutableStateFlow(getQuizScore())
+    val quizScore: StateFlow<Int> = _quizScore
+
+    fun getCustomFeedJson(): String = prefs.getString("custom_feed_json", "[]") ?: "[]"
+    fun setCustomFeedJson(jsonStr: String) {
+        prefs.edit().putString("custom_feed_json", jsonStr).apply()
+        _customFeedJson.value = jsonStr
+    }
+
+    fun getCustomQuizJson(): String = prefs.getString("custom_quiz_json", "[]") ?: "[]"
+    fun setCustomQuizJson(jsonStr: String) {
+        prefs.edit().putString("custom_quiz_json", jsonStr).apply()
+        _customQuizJson.value = jsonStr
+    }
+
+    fun getQuizScore(): Int = prefs.getInt("quiz_score", 0)
+    fun addQuizScore(points: Int) {
+        val newScore = getQuizScore() + points
+        prefs.edit().putInt("quiz_score", newScore).apply()
+        _quizScore.value = newScore
+    }
 }
+

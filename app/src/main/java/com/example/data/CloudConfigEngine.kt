@@ -34,7 +34,7 @@ data class AppCloudConfig(
     val specialAmals: List<String> = emptyList(),
     val announcementText: String = "",
     val openrouterApiKey: String = "",
-    val openrouterModelId: String = "google/gemini-2.0-flash-lite-preview-02-05:free"
+    val openrouterModelId: String = "google/gemini-2.5-flash"
 )
 
 object CloudConfigEngine {
@@ -78,7 +78,7 @@ object CloudConfigEngine {
                         specialAmals = amalsList,
                         announcementText = json.optString("announcement_text", ""),
                         openrouterApiKey = json.optString("openrouter_api_key", ""),
-                        openrouterModelId = json.optString("openrouter_model_id", "google/gemini-2.0-flash-lite-preview-02-05:free")
+                        openrouterModelId = json.optString("openrouter_model_id", "google/gemini-2.5-flash")
                     )
                 }
             }

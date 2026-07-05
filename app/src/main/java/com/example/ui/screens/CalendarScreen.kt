@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -378,6 +380,123 @@ fun CalendarScreen(
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Interactive Full Month Calendar Grid View
+        var viewMonthOffset by remember { mutableStateOf(0) }
+        val gridCal = remember(viewMonthOffset) {
+            Calendar.getInstance().apply {
+                add(Calendar.MONTH, viewMonthOffset)
+                set(Calendar.DAY_OF_MONTH, 1)
+            }
+        }
+        val maxDays = gridCal.getActualMaximum(Calendar.DAY_OF_MONTH)
+        val firstDayOfWeek = gridCal.get(Calendar.DAY_OF_WEEK) // 1=Sun, 7=Sat
+        val monthYearStr = SimpleDateFormat("MMMM yyyy", Locale("bn", "BD")).format(gridCal.time)
+        val selectedMonthHijri = PrayerTimeHelper.getHijriDate(gridCal)
+        val context = LocalContext.current
+
+        fun toBn(num: Any): String {
+            val bnDigits = charArrayOf('০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯')
+            return num.toString().map { if (it in '0'..'9') bnDigits[it - '0'] else it }.joinToString("")
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+            border = BorderStroke(1.dp, Gold.copy(alpha = 0.4f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { viewMonthOffset-- }) {
+                        Icon(Icons.Default.ChevronLeft, contentDescription = "Prev", tint = Gold)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(monthYearStr, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Gold)
+                        Text("${selectedMonthHijri.monthName} ${selectedMonthHijri.year} হিজরি", fontSize = 12.sp, color = TextSecondary)
+                    }
+                    IconButton(onClick = { viewMonthOffset++ }) {
+                        Icon(Icons.Default.ChevronRight, contentDescription = "Next", tint = Gold)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Days of week header
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    listOf("রবি", "সোম", "মঙ্গল", "বুধ", "বৃহ", "শুক্র", "শনি").forEach { dow ->
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            Text(dow, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (dow == "শুক্র") AccentGreen else Gold)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Calendar days grid (rows of 7)
+                val totalCells = (firstDayOfWeek - 1) + maxDays
+                val rows = (totalCells + 6) / 7
+                val todayCal = Calendar.getInstance()
+                val isCurrentMonth = viewMonthOffset == 0
+
+                for (r in 0 until rows) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                        for (c in 0 until 7) {
+                            val cellIdx = r * 7 + c
+                            val dayNum = cellIdx - (firstDayOfWeek - 1) + 1
+                            if (dayNum in 1..maxDays) {
+                                val isToday = isCurrentMonth && dayNum == todayCal.get(Calendar.DAY_OF_MONTH)
+                                val cellCal = gridCal.clone() as Calendar
+                                cellCal.set(Calendar.DAY_OF_MONTH, dayNum)
+                                val cellHijri = PrayerTimeHelper.getHijriDate(cellCal)
+                                val cellBangla = BanglaCalendarHelper.getBanglaDate(cellCal)
+
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .padding(2.dp)
+                                        .background(
+                                            color = if (isToday) Gold else if (c == 5) DarkGreen.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.05f),
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable {
+                                            Toast.makeText(context, "📅 $dayNum $monthYearStr\n🇧🇩 ${cellBangla.day} ${cellBangla.monthName}\n🌙 ${cellHijri.day} ${cellHijri.monthName}", Toast.LENGTH_LONG).show()
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(
+                                            text = toBn(dayNum),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = if (isToday) DarkGreen else if (c == 5) AccentGreen else Color.White
+                                        )
+                                        Text(
+                                            text = toBn(cellHijri.day),
+                                            fontSize = 9.sp,
+                                            color = if (isToday) DarkGreen.copy(alpha = 0.8f) else Gold.copy(alpha = 0.8f)
+                                        )
+                                    }
+                                }
+                            } else {
+                                Box(modifier = Modifier.weight(1f).aspectRatio(1f))
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("💡 যেকোনো তারিখে ট্যাপ করে সেই দিনের বাংলা ও হিজরি তারিখ দেখুন। শুক্রবার সবুজ চিহ্নিত।", fontSize = 11.sp, color = TextSecondary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Section header for events list
         Row(

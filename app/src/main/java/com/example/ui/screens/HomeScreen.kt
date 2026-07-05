@@ -1,8 +1,11 @@
 package com.example.ui.screens
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -14,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
+
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -720,13 +725,24 @@ fun HomeScreen(
             }
         }
 
-        // ⑦ Daily Hadith Card
+        // ⑦ Daily Islamic Quiz Section (দৈনিক ইসলামিক কুইজ ও জ্ঞান পরীক্ষা)
+        val customQuizJson by viewModel.settingsManager.customQuizJson.collectAsState()
+        val allQuizzes = remember(customQuizJson) { IslamicFeedAndQuizEngine.getCombinedQuizzes(customQuizJson) }
+        var currentQuizIndex by remember { mutableStateOf(0) }
+        val currentQuiz = remember(allQuizzes, currentQuizIndex) {
+            allQuizzes.getOrNull(currentQuizIndex % allQuizzes.size) ?: allQuizzes.first()
+        }
+        var selectedOption by remember(currentQuiz) { mutableStateOf<Int?>(null) }
+        var showQuizResult by remember(currentQuiz) { mutableStateOf(false) }
+        val quizScore by viewModel.settingsManager.quizScore.collectAsState()
+
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = SurfaceDark.copy(alpha = 0.5f))
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark.copy(alpha = 0.6f)),
+            border = BorderStroke(1.dp, Gold.copy(alpha = 0.4f))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -734,39 +750,328 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(imageVector = Icons.Default.Psychology, contentDescription = "Quiz", tint = Gold)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "🧠 দৈনিক ইসলামিক কুইজ",
+                            fontWeight = FontWeight.Bold,
+                            color = Gold,
+                            fontSize = 15.sp
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .background(DarkGreen, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(text = "পয়েন্ট: $quizScore 🏆", color = Gold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = currentQuiz.question,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    lineHeight = 22.sp
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                currentQuiz.options.forEachIndexed { idx, optionText ->
+                    val isSelected = selectedOption == idx
+                    val isCorrect = idx == currentQuiz.correctIndex
+                    val bgColor = when {
+                        !showQuizResult -> if (isSelected) Gold.copy(alpha = 0.2f) else SurfaceDark
+                        isCorrect -> PrimaryGreen.copy(alpha = 0.8f)
+                        isSelected && !isCorrect -> ErrorRed.copy(alpha = 0.7f)
+                        else -> SurfaceDark.copy(alpha = 0.4f)
+                    }
+                    val borderColor = when {
+                        !showQuizResult -> if (isSelected) Gold else Color.White.copy(alpha = 0.1f)
+                        isCorrect -> AccentGreen
+                        isSelected && !isCorrect -> ErrorRed
+                        else -> Color.Transparent
+                    }
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clickable(enabled = !showQuizResult) {
+                                selectedOption = idx
+                                showQuizResult = true
+                                if (idx == currentQuiz.correctIndex) {
+                                    viewModel.settingsManager.addQuizScore(10)
+                                    Toast.makeText(context, "মাশাআল্লাহ! সঠিক উত্তর (+১০ পয়েন্ট) 🌟", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "উত্তর সঠিক হয়নি, আবার চেষ্টা করুন!", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(containerColor = bgColor),
+                        border = BorderStroke(1.dp, borderColor)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "${idx + 1}. $optionText",
+                                fontSize = 13.sp,
+                                color = if (showQuizResult && isCorrect) Color.White else if (showQuizResult && isSelected && !isCorrect) Color.White else TextPrimary,
+                                fontWeight = if (isSelected || (showQuizResult && isCorrect)) FontWeight.Bold else FontWeight.Normal
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            if (showQuizResult && isCorrect) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = "Correct", tint = AccentGreen, modifier = Modifier.size(18.dp))
+                            } else if (showQuizResult && isSelected && !isCorrect) {
+                                Icon(Icons.Default.Cancel, contentDescription = "Wrong", tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+
+                if (showQuizResult) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = DarkGreen.copy(alpha = 0.6f)),
+                        border = BorderStroke(1.dp, Gold.copy(alpha = 0.3f))
+                    ) {
+                        Text(
+                            text = "💡 ব্যাখ্যা: ${currentQuiz.explanation}",
+                            color = Color.White.copy(alpha = 0.95f),
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(
+                        onClick = {
+                            currentQuizIndex = (currentQuizIndex + 1) % allQuizzes.size
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Gold, contentColor = DarkGreen),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("পরবর্তী কুইজ দেখুন ➡️", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        // ⑦.২ Islamic Feed Section (ইসলামিক ফিড: নসিহত ও স্ট্যাটাস)
+        val customFeedJson by viewModel.settingsManager.customFeedJson.collectAsState()
+        val allFeeds = remember(customFeedJson) { IslamicFeedAndQuizEngine.getCombinedFeeds(customFeedJson) }
+        var selectedFeedCategory by remember { mutableStateOf("সব") }
+        val filteredFeeds = remember(allFeeds, selectedFeedCategory) {
+            if (selectedFeedCategory == "সব") allFeeds else allFeeds.filter { it.category == selectedFeedCategory }
+        }
+        val coroutineScope = rememberCoroutineScope()
+        var isScrapingOnline by remember { mutableStateOf(false) }
+        var visibleFeedLimit by remember { mutableStateOf(4) }
+        val likedStatusIds = remember { mutableStateMapOf<String, Boolean>() }
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark.copy(alpha = 0.4f)),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(imageVector = Icons.Default.Article, contentDescription = "Feed", tint = AccentGreen)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "📜 ইসলামিক ফিড (নসিহত ও স্ট্যাটাস)",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontSize = 15.sp
+                        )
+                    }
                     Text(
-                        text = "📚 আজকের হাদিস",
-                        fontWeight = FontWeight.Bold,
-                        color = Gold,
-                        fontSize = 15.sp
-                    )
-                    Text(
-                        text = "সহীহ বুখারী — ৬০১৮",
-                        fontSize = 12.sp,
+                        text = "${filteredFeeds.size}টি পোস্ট",
+                        fontSize = 11.sp,
                         color = TextSecondary
                     )
                 }
                 Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = "“যে ব্যক্তি আল্লাহ ও শেষ দিনে (পরকালে) বিশ্বাস রাখে, সে যেন সর্বদা উত্তম কথা বলে অথবা চুপ থাকে।”",
-                    fontSize = 14.sp,
-                    color = TextPrimary,
-                    lineHeight = 21.sp
-                )
+
+                // Category Filter Chips
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf("সব", "নসিহত", "স্ট্যাটাস", "কুরআনের বাণী", "হাদিস").forEach { cat ->
+                        val isSel = selectedFeedCategory == cat
+                        Button(
+                            onClick = {
+                                selectedFeedCategory = cat
+                                visibleFeedLimit = 4
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isSel) Gold else DarkGreen.copy(alpha = 0.7f),
+                                contentColor = if (isSel) DarkGreen else Color.White
+                            ),
+                            shape = RoundedCornerShape(20.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text(text = cat, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(12.dp))
+
+                // Feeds List (Paginated / Smooth scroll)
+                filteredFeeds.take(visibleFeedLimit).forEach { feed ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = DarkGreen.copy(alpha = 0.4f)),
+                        border = BorderStroke(1.dp, Gold.copy(alpha = 0.2f))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .background(Gold.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text("#${feed.category}", color = Gold, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Text(feed.source, color = TextSecondary, fontSize = 11.sp)
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = feed.text,
+                                fontSize = 14.sp,
+                                color = Color.White.copy(alpha = 0.95f),
+                                lineHeight = 20.sp
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val isLiked = likedStatusIds[feed.id] == true
+                                val displayLikes = feed.likes + (if (isLiked) 1 else 0)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.clickable {
+                                        likedStatusIds[feed.id] = !isLiked
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                        contentDescription = "Like",
+                                        tint = if (isLiked) ErrorRed else TextSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("$displayLikes", color = TextSecondary, fontSize = 12.sp)
+                                }
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.clickable {
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            val clip = ClipData.newPlainText("Islamic Status", "${feed.text}\n(${feed.source}) — দ্বীনপথ অ্যাপ")
+                                            clipboard.setPrimaryClip(clip)
+                                            Toast.makeText(context, "স্ট্যাটাসটি কপি হয়েছে!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy", tint = Gold, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("কপি", color = Gold, fontSize = 12.sp)
+                                    }
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.clickable {
+                                            val shareIntent = Intent().apply {
+                                                action = Intent.ACTION_SEND
+                                                putExtra(Intent.EXTRA_TEXT, "${feed.text}\n— ${feed.source}\n(দ্বীনপথ অ্যাপ থেকে সংগ্রহ)")
+                                                type = "text/plain"
+                                            }
+                                            context.startActivity(Intent.createChooser(shareIntent, "শেয়ার করুন"))
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.Share, contentDescription = "Share", tint = AccentGreen, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("শেয়ার", color = AccentGreen, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    IconButton(onClick = {
-                        val shareIntent = Intent().apply {
-                            action = Intent.ACTION_SEND
-                            putExtra(Intent.EXTRA_TEXT, "আজকের হাদিস:\n“যে ব্যক্তি আল্লাহ ও শেষ দিনে বিশ্বাস রাখে, সে যেন উত্তম কথা বলে অথবা চুপ থাকে।”\n(সহীহ বুখারী — ৬০১৮) - দ্বীনপথ অ্যাপ")
-                            type = "text/plain"
+                    if (visibleFeedLimit < filteredFeeds.size) {
+                        Button(
+                            onClick = { visibleFeedLimit += 5 },
+                            colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark, contentColor = Gold),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("⬇️ আরও স্ট্যাটাস দেখুন", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
-                        context.startActivity(Intent.createChooser(shareIntent, "শেয়ার করুন"))
-                    }) {
-                        Icon(imageVector = Icons.Default.Share, contentDescription = "Share", tint = Gold)
+                    }
+
+                    Button(
+                        onClick = {
+                            if (!isScrapingOnline) {
+                                isScrapingOnline = true
+                                Toast.makeText(context, "🌐 অনলাইন থেকে পাবলিক ইসলামিক ডাটা সিঙ্ক হচ্ছে...", Toast.LENGTH_SHORT).show()
+                                coroutineScope.launch {
+                                    val resMsg = IslamicFeedAndQuizEngine.scrapeOnlineFeedsAndQuizzes(viewModel.settingsManager)
+                                    isScrapingOnline = false
+                                    Toast.makeText(context, resMsg, Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen, contentColor = Color.White),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (isScrapingOnline) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("সিঙ্ক হচ্ছে...", fontSize = 12.sp)
+                        } else {
+                            Icon(Icons.Default.CloudDownload, contentDescription = "Scrape", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("🌐 অনলাইন সিঙ্ক", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }

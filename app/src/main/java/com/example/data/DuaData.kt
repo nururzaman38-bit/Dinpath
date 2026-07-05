@@ -1,5 +1,8 @@
 package com.example.data
 
+import org.json.JSONArray
+import org.json.JSONObject
+
 data class DuaCategory(
     val id: String,
     val name: String,
@@ -14,7 +17,8 @@ data class Dua(
     val arabic: String,
     val pronunciation: String,
     val meaning: String,
-    val source: String
+    val source: String,
+    val audioUrl: String = ""
 )
 
 object DuaData {
@@ -184,4 +188,49 @@ object DuaData {
             "সহীহ মুসলিম — ৫৯১"
         )
     )
+
+    fun getCombinedDuas(customJsonStr: String): List<Dua> {
+        val customList = mutableListOf<Dua>()
+        try {
+            if (customJsonStr.isNotBlank() && customJsonStr != "[]") {
+                val array = JSONArray(customJsonStr)
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    customList.add(
+                        Dua(
+                            id = obj.optString("id", "c_$i"),
+                            categoryId = obj.optString("categoryId", "morning"),
+                            title = obj.optString("title", ""),
+                            arabic = obj.optString("arabic", ""),
+                            pronunciation = obj.optString("pronunciation", ""),
+                            meaning = obj.optString("meaning", ""),
+                            source = obj.optString("source", "এডমিন সংকলন"),
+                            audioUrl = obj.optString("audioUrl", "")
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return customList + duas
+    }
+
+    fun getDuaAudioUrl(dua: Dua): String {
+        if (dua.audioUrl.isNotBlank()) return dua.audioUrl.trim()
+        // Reliable direct audio recitations from Hisnul Muslim archive
+        return when {
+            dua.title.contains("ইস্তিগফার") || dua.title.contains("সাইয়্যিদুল") -> "https://ia801503.us.archive.org/15/items/Hisn_Almuslim_Audio/079.mp3"
+            dua.title.contains("সকালে") || dua.title.contains("সকাল") -> "https://ia801503.us.archive.org/15/items/Hisn_Almuslim_Audio/075.mp3"
+            dua.title.contains("জাহান্নাম") || dua.title.contains("আগুন") -> "https://ia801503.us.archive.org/15/items/Hisn_Almuslim_Audio/078.mp3"
+            dua.title.contains("ঘুমানো") || dua.title.contains("ঘুম") -> "https://ia801503.us.archive.org/15/items/Hisn_Almuslim_Audio/098.mp3"
+            dua.title.contains("জাগ্রত") || dua.title.contains("ওঠার") -> "https://ia801503.us.archive.org/15/items/Hisn_Almuslim_Audio/001.mp3"
+            dua.title.contains("মসজিদে প্রবেশ") -> "https://ia801503.us.archive.org/15/items/Hisn_Almuslim_Audio/020.mp3"
+            dua.title.contains("মসজিদ থেকে বের") -> "https://ia801503.us.archive.org/15/items/Hisn_Almuslim_Audio/021.mp3"
+            dua.title.contains("আহার") || dua.title.contains("খাবার") -> "https://ia801503.us.archive.org/15/items/Hisn_Almuslim_Audio/073.mp3"
+            dua.title.contains("রোজা") || dua.title.contains("রমজান") || dua.title.contains("ইফতার") -> "https://ia801503.us.archive.org/15/items/Hisn_Almuslim_Audio/074.mp3"
+            dua.title.contains("সফর") || dua.title.contains("গাড়ি") -> "https://ia801503.us.archive.org/15/items/Hisn_Almuslim_Audio/097.mp3"
+            else -> "https://ia801503.us.archive.org/15/items/Hisn_Almuslim_Audio/027.mp3"
+        }
+    }
 }

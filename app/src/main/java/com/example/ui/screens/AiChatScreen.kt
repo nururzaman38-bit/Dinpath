@@ -97,11 +97,10 @@ fun AiChatScreen(viewModel: DeenViewModel) {
                             color = Gold,
                             fontSize = 16.sp
                         )
-                        val modelName = cloudConfig?.openrouterModelId?.split("/")?.lastOrNull() ?: "Gemini AI"
                         Text(
-                            text = "Powered by OpenRouter ($modelName)",
+                            text = "DinPath AI - সার্বক্ষণিক ইসলামিক সমাধান",
                             color = AccentGreen,
-                            fontSize = 11.sp
+                            fontSize = 12.sp
                         )
                     }
                 }

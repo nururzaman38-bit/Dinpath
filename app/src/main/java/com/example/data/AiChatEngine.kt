@@ -66,7 +66,10 @@ object AiChatEngine {
             messagesArray.put(userObj)
 
             val requestBody = JSONObject()
-            val effectiveModel = if (modelId.isNotBlank()) modelId.trim() else "google/gemini-2.0-flash-lite-preview-02-05:free"
+            var effectiveModel = if (modelId.isNotBlank()) modelId.trim() else "google/gemini-2.5-flash"
+            if (effectiveModel.contains("preview-02-05")) {
+                effectiveModel = "google/gemini-2.5-flash"
+            }
             requestBody.put("model", effectiveModel)
             requestBody.put("messages", messagesArray)
             requestBody.put("temperature", 0.7)
@@ -97,7 +100,11 @@ object AiChatEngine {
             } else {
                 val errorReader = BufferedReader(InputStreamReader(connection.errorStream ?: connection.inputStream, "UTF-8"))
                 val errorStr = errorReader.use { it.readText() }
-                return@withContext "⚠️ API Error ($responseCode): ${errorStr.take(150)}"
+                // Retry if model ID was rejected
+                if ((responseCode == 400 || responseCode == 404) && errorStr.contains("not a valid model ID", ignoreCase = true) && effectiveModel != "google/gemini-2.5-flash") {
+                    return@withContext sendChatMessage(apiKey, "google/gemini-2.5-flash", history, userPrompt)
+                }
+                return@withContext "⚠️ API Error ($responseCode): ${errorStr.take(150)}\n(টিপস: এডমিন প্যানেল থেকে সঠিক OpenRouter Model ID সেট করুন, যেমন: google/gemini-2.5-flash)"
             }
         } catch (e: Exception) {
             e.printStackTrace()
