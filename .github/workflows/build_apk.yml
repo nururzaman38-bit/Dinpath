@@ -39,9 +39,6 @@ jobs:
           gradle-version: '9.3.1'
           validate-wrappers: false
 
-      - name: Grant Execute Permission for Gradle Wrapper
-        run: chmod +x ./gradlew
-
       - name: Configure Environment Secrets (.env)
         run: |
           if [ ! -f ".env" ] && [ -f ".env.example" ]; then
@@ -64,11 +61,11 @@ jobs:
           BUILD_TYPE="${{ github.event.inputs.build_type || 'debug' }}"
           echo "Building APK with target: $BUILD_TYPE"
           if [ "$BUILD_TYPE" == "release" ]; then
-            ./gradlew assembleRelease --stacktrace
+            gradle assembleRelease --stacktrace
           elif [ "$BUILD_TYPE" == "both" ]; then
-            ./gradlew assembleDebug assembleRelease --stacktrace
+            gradle assembleDebug assembleRelease --stacktrace
           else
-            ./gradlew assembleDebug --stacktrace
+            gradle assembleDebug --stacktrace
           fi
 
       - name: Upload APK Artifacts
