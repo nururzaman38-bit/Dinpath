@@ -1,0 +1,6 @@
+{
+  "name": "দ্বীনপথ",
+  "description": "বাংলাভাষী মুসলিমদের জন্য সম্পূর্ণ ইসলামিক অ্যাপ। নামাজের সময়, আজান notification, কিবলা, বাংলা কুরআন, দোয়া, তাসবিহ, হাদিস ও আরো অনেক কিছু।",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
